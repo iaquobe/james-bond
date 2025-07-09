@@ -13,6 +13,7 @@ def parse_args():
     parser.add_argument('-m', '--movie-name', type=str, default=argparse.SUPPRESS)
     parser.add_argument('-s', '--scene-name', type=str, default=argparse.SUPPRESS)
     parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument('-p', '--save-plots', action='store_true')
 
     # parse arguments 
     args = parser.parse_args()
@@ -39,7 +40,9 @@ if __name__ == '__main__':
 
     # set logging if debug set 
     logger = logging.getLogger('james-bond')
+    logging.basicConfig(level=logging.INFO)
     if args.debug:
+        print('enable debug')
         logger.setLevel(level=logging.DEBUG)
     else:
         logger.setLevel(level=logging.INFO)
@@ -47,19 +50,25 @@ if __name__ == '__main__':
     # instanciate analysis class
     logger.debug("instanciate class")
     from GenderAnalysis import GenderAnalysis
-    analysis = GenderAnalysis(args.scene_directory, args.output_dir)
+    analysis = GenderAnalysis(args.scene_directory, args.output_dir, save_plots=args.save_plots)
 
     # movie name set
     if 'movie_name' in args:
-        logger.debug("analyzing movie")
+        logger.debug("Analyzing movie")
         analysis.analyze_movie(args.movie_name)
 
     # scene set
-    if 'scene_name' in args: 
+    elif 'scene_name' in args: 
+        logger.debug("Analyzing scene")
         from ultralytics import YOLO
         yolo    = YOLO("yolo11n.pt")
-        results = yolo.predict(args.scene_name, classes=[0], conf=0.6, stream=True)
+        results = yolo.predict(args.scene_name, classes=[0], conf=0.5)
 
-        result = next(results)
+        result = results[0]
         analysis.analyze_scene(result)
+
+    # complete analysis
+    else: 
+        logger.debug("Analyzing movies")
+        analysis.analyze_movies()
 

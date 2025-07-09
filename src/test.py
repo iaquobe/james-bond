@@ -246,4 +246,213 @@ np.array(men).mean(axis=0)
 
 
 
-np.array(women).mean(axis=0)
+
+from ultralytics import YOLO
+import numpy as np 
+import cv2
+from PIL import Image
+
+path = "./scenes/1963-with-love-from-russia/1963-with-love-from-russia-Scene-0126-01.jpg"
+model = YOLO("yolo11n.pt")
+results = model.predict(path, classes=[0], conf=0.5, stream=True)
+result = next(results)
+
+
+result.show()
+
+img = cv2.cvtColor(result.orig_img, cv2.COLOR_BGR2RGB)
+im_pil = Image.fromarray(img)
+
+
+im_pil.show()
+
+
+
+
+
+    
+
+
+len(prompts)
+trait_ranges
+
+import torch
+t = torch.tensor(np.array([[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12]]))
+
+
+
+t[0, 0:2].softmax(dim=0)
+
+
+torch.tensor([t[0, 0:2].mean(), t[0, 2:4].mean()]).softmax(dim=0)
+
+traits = {}
+for (dimension, (description, beg, mid, end)) in trait_ranges.items():
+    # traits[dimension] = {}
+    softmax = torch.tensor([t[0, beg:mid].mean(), t[0, mid:end].mean()]).softmax(dim=0)
+    diff = softmax[1] - softmax[0]
+    traits[dimension] = {
+        'description': description, 
+        'value': diff
+    }
+
+
+traits
+
+labels = []
+values = []
+for (label, value) in traits.items(): 
+    labels.append(value["description"]) 
+    values.append(value["value"]) 
+values = torch.tensor(values)
+
+labels
+values
+
+
+
+
+values
+
+
+
+
+
+################################################################################
+### batch processing
+################################################################################
+from PIL import Image, ImageDraw
+import torch
+import clip
+import os
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model, preprocess = clip.load("ViT-B/32", device=device)
+
+
+path = './scenes/batch/'
+
+text = clip.tokenize(['elefant', 'bird', 'lizard', 'fish', 'bat', 'horse']).to(device)
+images = [Image.open(os.path.join(path, f))
+          for f in os.listdir(path)]
+images += images
+images += images
+images += images
+images += images
+images += images
+images += images
+len(images)
+
+batch = torch.stack([preprocess(image) for image in images])
+with torch.no_grad():
+    logits_per_image, logits_per_text = model(batch, text)
+    probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+
+
+################################################################################
+### without batch processing
+################################################################################
+sum = []
+for image in images: 
+    image = preprocess(image).unsqueeze(0).to(device)
+    with torch.no_grad():
+        logits_per_image, logits_per_text = model(image, text)
+        probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+        sum .append(logits_per_image)
+
+
+
+t = logits_per_image
+
+for (dimension, (description, beg, mid, end)) in trait_ranges.items():
+    print(beg, mid, end)
+
+t
+
+
+
+t[:, 0:1].mean(dim=1) 
+t[:, 1:2].mean(dim=1)
+
+i = 1
+t1 = torch.tensor([t[i, 2:5].mean() ,t[i, 5:8].mean()]).softmax(dim=0)
+t1[1] - t1[0]
+
+
+res = []
+for (_, (_,beg, mid, end)) in trait_ranges.items():
+    softmax = torch.stack( [t[:, beg:mid].mean(dim=1),
+                            t[:, mid:end].mean(dim=1)]
+                        ).T.softmax(dim=1)
+    diff = softmax[:,1] - softmax[:,0]
+    res.append(diff)
+traits = torch.stack(res).T
+
+
+
+
+
+traits = {}
+for (dimension, (description, beg, mid, end)) in trait_ranges.items():
+    # traits[dimension] = {}
+    softmax = torch.tensor([t[0, beg:mid].mean(), t[0, mid:end].mean()]).softmax(dim=0)
+    diff = softmax[1] - softmax[0]
+    traits[dimension] = {
+        'description': description, 
+        'value': diff
+    }
+
+
+################################################################################
+### trait ranges
+################################################################################
+trait_dict = {
+    'gender': ( 
+        "woman vs man",
+        ['a photo of a woman'],
+        ['a photo of a man'],
+    ),
+
+    'agency': (
+        "low vs high agency",
+        [
+            'a person overwhelmed with the situation',
+            'a person who is passive',
+            'a submissive person',
+
+        ],[
+            'a person in control of the situation',
+            'a person who gets what they want',
+            'a dominant person',
+        ],
+    ),
+
+    'sexualization' :(
+        "sexualized vs professional",
+        [
+            'a sexualized person',
+            'a person in a swimsuit',
+        ],[
+            'a professional person',
+            'a person in a suit',
+        ],
+    ),
+}
+
+
+trait_ranges = {}
+prompts = []
+for (trait_name, (description, prompts1, prompts2)) in trait_dict.items():
+    start = len(prompts)
+    prompts += prompts1
+    mid = len(prompts)
+    prompts += prompts2
+    end = len(prompts)
+
+    trait_ranges[trait_name] = (description, start, mid, end)
+
+
+
+images
+
+lookup = {images[0] : "elefant"}

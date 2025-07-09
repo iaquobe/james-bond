@@ -1,6 +1,7 @@
 from ultralytics import YOLO
 from PIL import Image
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
 import os
 import torch
@@ -42,12 +43,17 @@ class GenderAnalysis:
         and outputs analysis to analysis_directory
 
     '''
-    def __init__(self, scene_directory, analysis_directory):
+    def __init__(self, scene_directory, analysis_directory, min_confidence=0.5, save_plots=False, batch_proccess=False):
         # setup directories 
+        self.min_confidence     = min_confidence
+        self.batch_proccess     = batch_proccess
+        self.save_plots         = save_plots
+        self.plot_number        = 0
         self.scene_directory    = scene_directory
         self.analysis_directory = analysis_directory
         if not os.path.exists(analysis_directory): 
             os.mkdir(analysis_directory)
+
 
 
         # CLIP model
@@ -57,34 +63,52 @@ class GenderAnalysis:
 
         # person traits
         logger.debug("Create trait embeddings")
-        self.traits = [
-            # GENDER
-            'a photo of a woman',
-            'a photo of a man',
+        self.trait_dict = {
+            'gender': ( 
+                "woman vs man",
+                ['a photo of a woman'],
+                ['a photo of a man'],
+            ),
 
-            # DEPICTION 
-            # control 
-            'a photo of a person overwhelmed with the situation',
-            'a photo of a person in control of the situation',
+            'agency': (
+                "submissive vs dominant",
+                [
+                    'a person overwhelmed with the situation',
+                    'a person who is passive',
+                    'a submissive person',
 
-            # sexualization
-            'a photo of a sexualized person',
-            'a photo of a professional person',
+                ],[
+                    'a person in control of the situation',
+                    'a person who gets what they want',
+                    'a dominant person',
+                ],
+            ),
 
-            # active 
-            'a photo of a person who gets what they want',
-            'a photo of a person who is passive',
+            'sexualization' :(
+                "sexualized vs professional",
+                [
+                    'a sexualized person',
+                    'a person in a swimsuit',
+                ],[
+                    'a professional person',
+                    'a person in a suit',
+                ],
+            ),
+        }
 
-        ]
+        self.trait_labels = [d for (d,_,_) in self.trait_dict.values()]
+        self.trait_ranges = {}
+        self.traits = []
+        for (trait_name, (description, prompts1, prompts2)) in self.trait_dict.items():
+            start = len(self.traits)
+            self.traits += prompts1
+            mid = len(self.traits)
+            self.traits += prompts2
+            end = len(self.traits)
+
+            self.trait_ranges[trait_name] = (description, start, mid, end)
+
         self.trait_embeddings = clip.tokenize(self.traits).to(self.device)
-        self.trait_pairs = [(self.traits[i], self.traits[i+1]) 
-                            for i in range(0, len(self.traits), 2)]
-        self.clean_trait_pairs = [
-            ("woman","man"),
-            ("overwhelmed","in control"),
-            ("sexualized","professional"),
-            ("active","passive"),
-        ]
 
 
 
@@ -92,7 +116,8 @@ class GenderAnalysis:
     ##### Analyze Movies
     ############################################################################
     def analyze_movies(self):
-        pass
+        for movie in os.listdir(self.scene_directory): 
+            self.analyze_movie(movie)
 
 
 
@@ -107,21 +132,20 @@ class GenderAnalysis:
         # input/output dirs
         logger.debug("Analyze movie: {}".format(movie_name))
         input_dir  = os.path.join(self.scene_directory   , movie_name)
-        output_dir = os.path.join(self.analysis_directory, movie_name)
-        if not os.path.exists(output_dir): 
-            os.mkdir(output_dir)
+        if not os.path.exists(self.analysis_directory): 
+            os.mkdir(self.analysis_directory)
 
         # analyze each scene in movie
         yolo    = YOLO("yolo11n.pt")
-        results = yolo.predict(input_dir, classes=[0], conf=0.6, stream=True)
+        results = yolo.predict(input_dir, classes=[0], conf=self.min_confidence, stream=True)
         traits  = []
         for result in results:
             traits += self.analyze_scene(result)
 
         movie = {
             'movie_name': movie_name, 
-            'trait_values': np.array(traits),
-            'trait_pairs' : self.trait_pairs,
+            'traits': np.array(traits),
+            'trait_description': self.trait_dict,
         }
 
         out_path = os.path.join(self.analysis_directory, "{}.pkl".format(movie_name))
@@ -166,14 +190,39 @@ class GenderAnalysis:
 
         with torch.no_grad():
             logits, _ = self.clip_model(image, self.trait_embeddings)
-            windows         = logits.unfold(dimension=1, size=2, step=2)
-            softmax_pairs   = windows.softmax(dim=2)[0]
-            traits          = softmax_pairs[:, 1] - softmax_pairs[:, 0]
+            traits = self.compute_traits(logits)
 
         if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(traits)
             self.plot_traits(person_image, traits)
 
         return traits
+
+
+    def compute_traits(self, logits): 
+        traits = []
+        for (_,(_, beg, mid, end)) in self.trait_ranges.items():
+            softmax = torch.tensor([logits[0, beg:mid].mean(), logits[0, mid:end].mean()]).softmax(dim=0)
+            diff = softmax[1] - softmax[0]
+            traits.append(diff)
+        return torch.tensor(traits)
+
+
+
+    ############################################################################
+    ##### Batch Proccessing
+    ############################################################################
+    def compute_batch_traits(self, logits): 
+        res = []
+        for (_, (_,beg, mid, end)) in self.trait_ranges.items():
+            softmax = torch.stack( [logits[:, beg:mid].mean(dim=1),
+                                    logits[:, mid:end].mean(dim=1)]
+                                ).T.softmax(dim=1)
+            diff = softmax[:,1] - softmax[:,0]
+            res.append(diff)
+        return torch.stack(res).T
+
+    
 
 
 
@@ -182,28 +231,46 @@ class GenderAnalysis:
     ##### Debug Functions 
     ############################################################################
     def plot_scene(self, result): 
-        result.show()
-        cv2.waitKey(0)      # This will block until you press a key or close the window
-        cv2.destroyAllWindows()
+        self.current_scene = cv2.cvtColor(result.plot(), cv2.COLOR_BGR2RGB)
 
+    def plot_traits(self, person_image, traits): 
+        # Create figure and GridSpec layout
+        fig = plt.figure(figsize=(10, 8))
+        gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1])  # 2 rows, 2 columns
 
+        # Top full-width image (self.current_scene)
+        ax_top = fig.add_subplot(gs[0, :])
+        ax_top.imshow(self.current_scene)
+        ax_top.axis("off")
+        ax_top.set_title("Scene")
 
-    def plot_traits(self, person_image, positions): 
-        # Plot image and logits
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-
-        # Show image
+        # Bottom left: person image
+        ax1 = fig.add_subplot(gs[1, 0])
         ax1.imshow(person_image)
         ax1.axis("off")
         ax1.set_title("Person")
 
-        y_pos = range(len(self.trait_pairs))
-        plt.barh(y_pos, positions, color='skyblue', height=0.5)
+        # Bottom right: bar plot
+        values = traits
+        logger.debug(self.trait_labels)
+        logger.debug(values)
+
+        ax2 = fig.add_subplot(gs[1, 1])
+        y_pos = range(len(self.trait_labels))
+        ax2.barh(y_pos, values, color='skyblue', height=0.5)
         ax2.axvline(0, color='gray', linewidth=1)
-        ax2.set_yticks(y_pos, [f"{t[0]} vs {t[1]}" for t in self.clean_trait_pairs])
+        ax2.set_yticks(y_pos, self.trait_labels)
         ax2.set_xlim(-1, 1)
         ax2.set_xlabel("Spectrum Position")
         ax2.set_title("Opposite Traits Spectrum")
 
         plt.tight_layout()
-        plt.show()
+
+
+        if self.save_plots: 
+            path = os.path.join(self.analysis_directory, "plot-{:03d}".format(self.plot_number))
+            logger.debug("saving plot to {}".format(path))
+            plt.savefig(path)
+            self.plot_number += 1
+        else: 
+            plt.show()

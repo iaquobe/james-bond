@@ -9,8 +9,12 @@ fi
 in_dir=$1
 out_dir=$2
 
+echo "$(ls $in_dir | wc -l) movies found in $in_dir"
+
 for file in $(ls $in_dir)
 do
+	echo "Processing movie $file"
+
 	movie_name=$(cut -d "." -f 1 <<< "$file")
 	movie_scene_path="$out_dir/$movie_name"
 
