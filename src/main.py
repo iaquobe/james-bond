@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument('-s', '--scene-name', type=str, default=argparse.SUPPRESS)
     parser.add_argument('-d', '--debug', action='store_true')
     parser.add_argument('-p', '--save-plots', action='store_true')
+    parser.add_argument('-b', '--batch-size', type=int, default=100)
 
     # parse arguments 
     args = parser.parse_args()
@@ -50,7 +51,7 @@ if __name__ == '__main__':
     # instanciate analysis class
     logger.debug("instanciate class")
     from GenderAnalysis import GenderAnalysis
-    analysis = GenderAnalysis(args.scene_directory, args.output_dir, save_plots=args.save_plots)
+    analysis = GenderAnalysis(args.scene_directory, args.output_dir, save_plots=args.save_plots, batch_size=args.batch_size)
 
     # movie name set
     if 'movie_name' in args:
@@ -62,10 +63,11 @@ if __name__ == '__main__':
         logger.debug("Analyzing scene")
         from ultralytics import YOLO
         yolo    = YOLO("yolo11n.pt")
-        results = yolo.predict(args.scene_name, classes=[0], conf=0.5)
+        results = yolo.predict(args.scene_name, classes=[0])
 
         result = results[0]
-        analysis.analyze_scene(result)
+        res = analysis.analyze_scene(result, force=True)
+        logger.debug(res)
 
     # complete analysis
     else: 

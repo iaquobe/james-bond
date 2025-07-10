@@ -456,3 +456,48 @@ for (trait_name, (description, prompts1, prompts2)) in trait_dict.items():
 images
 
 lookup = {images[0] : "elefant"}
+
+import torch
+a = torch.tensor([[0.3, 0.3], [0.2, 0.2]])
+b = torch.tensor([[0.1, 0.1]])
+b = torch.tensor([])
+
+torch.concat([a,b])
+
+
+
+
+
+
+import pickle
+with open('./analysis/test/1963-with-love-from-russia.pkl', 'rb') as f: 
+    loaded = pickle.load(f)
+
+
+with open('./analysis/james-bond/1962-dr-no.pkl', 'rb') as f: 
+    loaded = pickle.load(f)
+
+
+import os
+path = './analysis/james-bond/'
+for file in os.listdir(path): 
+    fpath = os.path.join(path,file)
+    with open('./analysis/james-bond/1962-dr-no.pkl', 'rb') as f: 
+        loaded = pickle.load(f)
+
+
+
+
+
+
+
+a = torch.tensor([[-0.9776, -0.0085, -0.9975], [ 0.8820, -0.1005, -0.9861]])
+b = torch.tensor([[-0.9612,  0.2987,  0.2045], [ 0.2783,  0.5522,  0.4185], [ 0.5136,  0.5603,  0.9113], [ 0.5507,  0.5077,  0.7304], [ 0.0326,  0.4548,  0.6571]])
+c = torch.tensor([[ 0.9282,  0.2356, -0.9654], [-0.7771,  0.0076, -0.9716]])
+d = torch.tensor([[-0.9945,  0.5074, -0.9731], [ 0.8027,  0.4425, -0.3174]])
+e = torch.tensor([])
+
+
+
+torch.concat([a,b, c, d, e])
+torch.concat([a,b, c, d]).shape

@@ -43,17 +43,22 @@ class GenderAnalysis:
         and outputs analysis to analysis_directory
 
     '''
-    def __init__(self, scene_directory, analysis_directory, min_confidence=0.5, save_plots=False, batch_proccess=False):
+    def __init__(self, scene_directory, analysis_directory, min_confidence=0.5, save_plots=False, batch_size=100):
         # setup directories 
         self.min_confidence     = min_confidence
-        self.batch_proccess     = batch_proccess
         self.save_plots         = save_plots
-        self.plot_number        = 0
+        self.trait_plot_number  = 0
+        self.scene_plot_number  = 0
         self.scene_directory    = scene_directory
         self.analysis_directory = analysis_directory
         if not os.path.exists(analysis_directory): 
             os.mkdir(analysis_directory)
 
+
+        # batches
+        self.batch_size = batch_size
+        self.batch      = []
+        self.scenes     = []
 
 
         # CLIP model
@@ -89,9 +94,11 @@ class GenderAnalysis:
                 [
                     'a sexualized person',
                     'a person in a swimsuit',
+                    'a scantily clad person',
                 ],[
                     'a professional person',
-                    'a person in a suit',
+                    'a person in formal attire',
+                    'an adequatly dressed person',
                 ],
             ),
         }
@@ -140,11 +147,15 @@ class GenderAnalysis:
         results = yolo.predict(input_dir, classes=[0], conf=self.min_confidence, stream=True)
         traits  = []
         for result in results:
-            traits += self.analyze_scene(result)
+            traits.append(self.analyze_scene(result))
+        traits.append(self.analyze_batch())
 
+
+        traits = torch.concat(traits)
+        logger.debug(traits)
         movie = {
             'movie_name': movie_name, 
-            'traits': np.array(traits),
+            'traits': traits,
             'trait_description': self.trait_dict,
         }
 
@@ -157,7 +168,7 @@ class GenderAnalysis:
     ############################################################################
     ##### Analyze Scene
     ############################################################################
-    def analyze_scene(self, result): 
+    def analyze_scene(self, result, force=False): 
         ''' Analyze found persons in image
         Args: 
             result: YOLO result for 
@@ -167,51 +178,54 @@ class GenderAnalysis:
         image   = result.orig_img
         persons = result.boxes
 
-        if logger.isEnabledFor(logging.DEBUG) and len(persons) > 0:
-            self.plot_scene(result)
-
-        traits = []
-        for person_box in persons:
+        # add all persons to batch
+        beg = len(self.batch)
+        for person_box in persons: 
             person_image = crop_person(person_box, image)
-            traits.append(self.analyze_person(person_image))
+            self.batch.append(person_image)
 
-        return traits
 
+        # add original image
+        end = len(self.batch)
+        if logger.isEnabledFor(logging.DEBUG) and len(persons) > 0:
+            cv2_img     = result.plot()
+            scene_image = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
+            self.plot_scene(cv2_img)
+            self.scenes.append((scene_image, beg, end))
+
+
+        # run if batch full
+        if len(self.batch) > self.batch_size or force: 
+            return self.analyze_batch()
+        return torch.tensor([])
 
 
     ############################################################################
-    ##### Analyze Person
+    ##### Analyze Persons in Batch
     ############################################################################
-    def analyze_person(self, person_image): 
-        # tokenize person_image
-        image = (self.preprocess(person_image)
-                    .unsqueeze(0)
-                     .to(self.device))
+    def analyze_batch(self):
+        if len(self.batch) == 0: 
+            return torch.tensor([])
 
+        # analyze
+        batch = torch.stack([self.preprocess(person) for person in self.batch])
         with torch.no_grad():
-            logits, _ = self.clip_model(image, self.trait_embeddings)
-            traits = self.compute_traits(logits)
+            logits, _ = self.clip_model(batch, self.trait_embeddings)
+            traits = self.compute_batch_traits(logits)
 
+        # plotting
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(traits)
-            self.plot_traits(person_image, traits)
+            for (scene,beg,end) in self.scenes: 
+                for person in range(beg, end): 
+                    self.plot_traits(scene, self.batch[person], traits[person])
 
+        # reset
+        self.scenes = []
+        self.batch = []
         return traits
 
 
-    def compute_traits(self, logits): 
-        traits = []
-        for (_,(_, beg, mid, end)) in self.trait_ranges.items():
-            softmax = torch.tensor([logits[0, beg:mid].mean(), logits[0, mid:end].mean()]).softmax(dim=0)
-            diff = softmax[1] - softmax[0]
-            traits.append(diff)
-        return torch.tensor(traits)
 
-
-
-    ############################################################################
-    ##### Batch Proccessing
-    ############################################################################
     def compute_batch_traits(self, logits): 
         res = []
         for (_, (_,beg, mid, end)) in self.trait_ranges.items():
@@ -230,17 +244,22 @@ class GenderAnalysis:
     ############################################################################
     ##### Debug Functions 
     ############################################################################
-    def plot_scene(self, result): 
-        self.current_scene = cv2.cvtColor(result.plot(), cv2.COLOR_BGR2RGB)
+    def plot_scene(self, scene): 
+        if self.save_plots: 
+            path = os.path.join(self.analysis_directory, 
+                                "scene-{:03d}.jpg".format(self.scene_plot_number))
+            logger.debug("saving plot to {}".format(path))
+            cv2.imwrite(path, scene)
+            self.scene_plot_number += 1
 
-    def plot_traits(self, person_image, traits): 
+    def plot_traits(self, scene, person_image, traits): 
         # Create figure and GridSpec layout
         fig = plt.figure(figsize=(10, 8))
         gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1])  # 2 rows, 2 columns
 
         # Top full-width image (self.current_scene)
         ax_top = fig.add_subplot(gs[0, :])
-        ax_top.imshow(self.current_scene)
+        ax_top.imshow(scene)
         ax_top.axis("off")
         ax_top.set_title("Scene")
 
@@ -268,9 +287,10 @@ class GenderAnalysis:
 
 
         if self.save_plots: 
-            path = os.path.join(self.analysis_directory, "plot-{:03d}".format(self.plot_number))
+            path = os.path.join(self.analysis_directory, "traits-{:03d}".format(self.trait_plot_number))
             logger.debug("saving plot to {}".format(path))
             plt.savefig(path)
-            self.plot_number += 1
+            self.trait_plot_number += 1
+            plt.close()
         else: 
             plt.show()

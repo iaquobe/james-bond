@@ -1,0 +1,12 @@
+# Fdb version 4
+["pdflatex"] 1750855231.62486 "/home/iaquobe/Courses/Cultural-Analytics/expose/bib.bib" "bib.pdf" "bib" 1750855231.883 2
+  "/home/iaquobe/Courses/Cultural-Analytics/expose/bib.bib" 1750855231.492 1735 6e05bb82d229662965d78ef2acf8626c ""
+  "/usr/share/texlive/texmf-dist/web2c/texmf.cnf" 1737590400 40900 887e0dc8cac988a9e9c574af364cf837 ""
+  "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1749132783 7753798 9c2929c54827fbb1785bc3dfae5dfe3d ""
+  "bib.aux" 1750854606.52538 32 3985256e7290058c681f74d7a3565a19 "pdflatex"
+  "bib.bib" 1750855231.492 1735 6e05bb82d229662965d78ef2acf8626c ""
+  (generated)
+  "bib.aux"
+  "bib.log"
+  "bib.pdf"
+  (rewritten before read)
