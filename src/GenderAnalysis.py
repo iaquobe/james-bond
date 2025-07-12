@@ -98,7 +98,7 @@ class GenderAnalysis:
                 ],[
                     'a professional person',
                     'a person in formal attire',
-                    'an adequatly dressed person',
+                    'an adequately dressed person',
                 ],
             ),
         }
