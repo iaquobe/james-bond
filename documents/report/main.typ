@@ -36,8 +36,8 @@ the last decades.
 Specifically, we have chosen the James Bond film series as subject of research. 
 To make our findings quantifiable, the films were analyzed using pretrained
 AI models, notably YOLO @pypiUltralytics and CLIP @githubGitHubOpenaiCLIP.
-Given the computer guided approach, we also investigate whether 
-this method yields valid and meaningful results. 
+Given the use of pretrained models, we also investigate the validity 
+of our method.
 
 In the process we have created an analysis framework,
 which can be used for other research questions. 
@@ -64,8 +64,8 @@ A trend was discovered that women in later movies were
 subjected to more violence and were involved in more sexual activities. 
 However the authors also pointed out that the roles of women 
 changed from very limited roles to more autonomous and active roles. 
-In our study we hope eliminate the factor of the changing roles, 
-as our analysis focuses on the appearance rather than the activity. 
+Our study differs from Neuendorf's in that we are observing the
+appearance rather than the activity of the different roles. 
 
 = Dataset
 <dataset>
@@ -74,14 +74,14 @@ The corpus chosen for our analysis is the James Bond 50th Anniversary
 DVD Collection. 
 It was chosen for several reasons: 
 *Long Running Series:*
-The collection contains films starting from 1962 to 2008 allowing 
+The collection contains films from 1962 to 2008 allowing 
 for an observation period of 46 years.
 *Series Containing Many Films:*
 The Collection contains 22 films.
-The release interval varies from film to movie,
+The release interval varies from film to film,
 but overall they were released mostly regularly. 
 The longest time between releases was 6 years, 
-but the average is around 2 years. 
+while the average is around 2 years. 
 *Limiting Confounding Factors:*
 By limiting our observation to one series, we limit confounding factors. 
 James Bond films all are of the same genre, 
@@ -92,10 +92,12 @@ This makes comparison easier than comparing films of completely different genres
 *Notoriety For Gender Representation:*
 The James Bond series is notorious for its representation of women, 
 even coining the term Bond girl @wikipediaBondGirl. 
-The prior research on this Series also allows us to validate our methodology, 
+The prior research on this Series allows us to validate our methodology, 
 to test whether it can be applied to other corpora.
-The choice of only using James Bond movies however also 
-limits the generalizability to other films. 
+The use of only James Bond movies however also sets limitations for our study, 
+as discussed later. 
+// The choice of only using James Bond movies however also 
+// limits the generalizability to other films. 
 
 The films were digitized using VLC.
 Due to copyright restrictions, they are not provided with the code-base. 
@@ -160,7 +162,7 @@ improve performance @PromptEnsemble.
     columns: 3,
     align: left,
     stroke: none,
-    table.header([*trait*], [*negative*], [*positive*]),
+    table.header([*trait*], [*stereotypical female traits*], [*stereotypical male traits*]),
     table.hline(),
 
     [*gender*], ["a photo of a woman"], ["a photo of a man"],
@@ -192,43 +194,50 @@ improve performance @PromptEnsemble.
   )
 
 
-The following formula used to transform 
-logits to a score from 0 to 1, 
-indicating how strongly the negative traits apply.
-To determine the degree of sexualization for instance, 
-the mean would be calculated from the logits $a$ corresponding to
-one ensemble.
+The CLIP similarity values are averaged within the ensemble 
+and then tranformed into scores from 0 to 1. 
+0 indicates stereotypical male traits (dominant and professional), 
+and 1 indicates stereotypical female traits (sexualized and submissive).
 
 
-$ 
-"score" &= sigma(overline("logits"_"trait"^-), 
-                         overline("logits"_"trait"^+))\
+// $ 
+// "score" &= sigma(overline("logits"_"trait"^-), 
+//                          overline("logits"_"trait"^+))\
+//
+// arrow("a"_-) &= vec("a"_"\"sexualized\"", 
+//                    "a"_"\"swimsuit\"", 
+//                    "a"_"\"scantily clad\"")\
+//
+// arrow("a"_+) &= vec("a"_"\"professional\"", 
+//                    "a"_"\"formal attire\"", 
+//                    "a"_"\"adequatly dressed\"")\
+//
+// "score" &= sigma(overline("a"_+), overline("a"_-))
+//
+// $
 
-arrow("a"_-) &= vec("a"_"\"sexualized\"", 
-                   "a"_"\"swimsuit\"", 
-                   "a"_"\"scantily clad\"")\
+= Limitations
 
-arrow("a"_+) &= vec("a"_"\"professional\"", 
-                   "a"_"\"formal attire\"", 
-                   "a"_"\"adequatly dressed\"")\
+Our choice of corpus and methods comes with several limitations:
 
-"score" &= sigma(overline("a"_+), overline("a"_-))
+*Corpus:* While limiting our observation to the James Bond film 
+series comes with many benefits, there are also some limitations associated with it. 
+While the 22 films provide a large sampel size for a film series, 
+it is still prone to film-to-film variations. 
+Limiting ourselves to James Bond also limits the ability 
+to generalize our findings to other films.
 
-$
-
-=== Limitations
-
-This approach has limitations as can bee seen in @fig-partial-person, 
-where traits of a partial person are analyzed, and in @fig-background-person, 
-where a person in the background impacts the detected traits. 
-Additionally, the model and the prompt bias can also contribute to 
-a difference between genders. 
-Finally, the chosen prompt ensembles describe vague concepts such as "sexualized"
-or "dominant", which may be difficult for a model to understand. 
-A change to concrete prompts may increase the performance. 
-However, by averaging over multiple such terms, 
-we hope that we can still achieve meaningful results. 
-We will investigate the validity of the prompts later in @findings
+*Method:*
+Using pretrained models also brings a set of limitations. 
+Object detection recognizes partial persons,
+where analyzing traits is not helpfull (see @fig-partial-person).
+Trait Analysis with CLIP does not differentiate between the person of interest, 
+and background (see @fig-background-person).
+The used models themselves can be biased 
+(i.e. models attributing higher sexualization scores for women, regardless of input). 
+And finally the prompts use abstract concepts 
+such as "sexualized" or "dominant", which might be difficult for the models to understand.
+We hope to mitigate this by using prompt ensembles. 
 
 
 #grid(
@@ -245,7 +254,7 @@ We will investigate the validity of the prompts later in @findings
     )
   ]),
   grid.cell([
-    #figure(image("./assets/examples/plot-008.png"),
+    #figure(image("./assets/traits/traits-008.png"),
     caption: [
       The gender is correctly inferred, 
       but the degree of sexualization is clearly wrong. 
@@ -260,7 +269,7 @@ We will investigate the validity of the prompts later in @findings
     ]
   )]),
   grid.cell([
-    #figure(image("./assets/examples/plot-012.png"),
+    #figure(image("./assets/traits/traits-012.png"),
       caption: [
         While the gender is correctly inferred, 
         only the arm is visible. 

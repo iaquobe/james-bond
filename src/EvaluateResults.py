@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 ################################################################################
 show=False
 save=True
+
+show=True
+save=False
+
 metadata = pd.read_csv("metadata.csv", skipinitialspace=True)
 metadata['file']
 
@@ -46,9 +50,10 @@ metadata['title_year'] = metadata['Film'] + ': ' + metadata['Year'].astype(str)
 ### Line Plot Sexualization
 ################################################################################
 years = metadata['Year']
+plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.plot(years, sex_m, label='men')
 plt.plot(years, sex_f, label='women')
-plt.ylim([0,1])
+# plt.ylim([0,1])
 plt.ylabel("Degree of sexualization")
 plt.xlabel("Release Date")
 plt.title("Sexualization by film and gender")
@@ -64,9 +69,10 @@ plt.close()
 ################################################################################
 ### Line Plot Helplessness
 ################################################################################
+plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.plot(years, ag_m, label='men')
 plt.plot(years, ag_f, label='women')
-plt.ylim([0,1])
+# plt.ylim([0,1])
 plt.ylabel("Degree of helplessness")
 plt.xlabel("Release Date")
 plt.title("Helplessness by film and gender")
@@ -85,6 +91,7 @@ plt.close()
 ################################################################################
 ### Scatter Plot Helplessness
 ################################################################################
+plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.scatter(years, ag_m, label='men')
 plt.scatter(years, ag_f, label='women')
 z_m = np.polyfit(years, ag_m, 1)
@@ -93,7 +100,7 @@ plt.plot(years, p_m(years))
 z_f = np.polyfit(years, ag_f, 1)
 p_f = np.poly1d(z_f)
 plt.plot(years, p_f(years))
-plt.ylim([0,1])
+# plt.ylim([0,1])
 plt.ylabel("Degree of helplessness")
 plt.xlabel("Release Date")
 plt.title("Helplessness by film and gender")
@@ -110,6 +117,7 @@ plt.close()
 ### Scatter Plot Sexualization
 ################################################################################
 years = metadata['Year']
+plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.scatter(years, sex_m, label='men')
 plt.scatter(years, sex_f, label='women')
 z_m = np.polyfit(years, sex_m, 1)
@@ -118,7 +126,7 @@ plt.plot(years, p_m(years))
 z_f = np.polyfit(years, sex_f, 1)
 p_f = np.poly1d(z_f)
 plt.plot(years, p_f(years))
-plt.ylim([0,1])
+# plt.ylim([0,1])
 plt.ylabel("Degree of sexualization")
 plt.xlabel("Release Date")
 plt.title("Sexualization by film and gender")
@@ -138,10 +146,11 @@ titles = metadata['title_year']
 x = np.arange(len(titles))  
 width = 0.35  
 fig, ax = plt.subplots()
+plt.grid(axis='y', linestyle='--', alpha=0.7)
 bars1 = ax.bar(x - width/2, sex_m, width, label='men')
 bars2 = ax.bar(x + width/2, sex_f, width, label='women')
 ax.set_ylabel("Degree of sexualization")
-ax.set_ylim([0,1])
+ax.set_ylim([0,0.9])
 ax.set_title('Sexualization by film and gender')
 ax.set_xticks(x)
 ax.set_xlabel('Movie Title (Release)')
@@ -211,11 +220,35 @@ plt.close()
 
 
 
+
+################################################################################
+### Difference
+################################################################################
+years = metadata['Year']
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.scatter(years, sex_f - sex_m, label='differene')
+z_d = np.polyfit(years, sex_f - sex_m, 1)
+p_d = np.poly1d(z_d)
+plt.plot(years, p_d(years))
+# plt.ylim([0,1])
+plt.ylabel("Degree of sexualization")
+plt.xlabel("Release Date")
+plt.title("Sexualization by film and gender")
+plt.legend()
+if save: 
+    plt.savefig("documents/report/assets/scatter-sexualization-difference.png")
+if show:
+    plt.show()
+plt.close()
+
+
 ################################################################################
 ### Testing
 ################################################################################
 print("women trend: 1962={} and 2008={}".format(p_f(1962), p_f(2008)))
 print("men trend: 1962={} and 2008={}".format(p_m(1962), p_m(2008)))
+print("difference trend: 1962={} and 2008={}".format(p_d(1962), p_d(2008)))
 
 print('mean sexualization m={}, f={}'.format(sex_m.mean(), sex_f.mean()))
+
 

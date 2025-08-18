@@ -70,13 +70,13 @@ class GenderAnalysis:
         logger.debug("Create trait embeddings")
         self.trait_dict = {
             'gender': ( 
-                "woman vs man",
+                "woman man",
                 ['a photo of a woman'],
                 ['a photo of a man'],
             ),
 
             'agency': (
-                "submissive vs dominant",
+                "submissive dominant",
                 [
                     'a person overwhelmed with the situation',
                     'a person who is passive',
@@ -90,7 +90,7 @@ class GenderAnalysis:
             ),
 
             'sexualization' :(
-                "sexualized vs professional",
+                "sexualized professional",
                 [
                     'a sexualized person',
                     'a person in a swimsuit',
@@ -269,6 +269,9 @@ class GenderAnalysis:
         ax1.axis("off")
         ax1.set_title("Person")
 
+
+        left_labels, right_labels = zip(*(label.split() for label in self.trait_labels))
+
         # Bottom right: bar plot
         values = traits
         logger.debug(self.trait_labels)
@@ -278,7 +281,15 @@ class GenderAnalysis:
         y_pos = range(len(self.trait_labels))
         ax2.barh(y_pos, values, color='skyblue', height=0.5)
         ax2.axvline(0, color='gray', linewidth=1)
-        ax2.set_yticks(y_pos, self.trait_labels)
+        ax2.set_yticks(y_pos, left_labels)
+        ax2.tick_params(labelsize=20)
+        
+        ax_right = ax2.twinx()
+        ax_right.set_ylim(ax2.get_ylim())
+        ax_right.set_yticks(y_pos, right_labels)
+        ax_right.tick_params(labelsize=20)
+
+
         ax2.set_xlim(-1, 1)
         ax2.set_xlabel("Spectrum Position")
         ax2.set_title("Opposite Traits Spectrum")
